@@ -7,11 +7,11 @@ import java.util.List;
 
 public interface ReadData {
 
-    Item getByIdItem(Integer id);
+    Item getByIdItem(String id);
 
     List<Item> getAllItem();
 
-    Group getByIdGroup(Integer id);
+    Group getByIdGroup(String id);
 
     List<Group> getAllGroup();
 }

@@ -1,33 +1,47 @@
 package controller;
 
+import models.BodyRequestReceipt;
+import models.Group;
+import models.Item;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import service.ServiceDate;
 
 @RestController
 public class GoodsRestController {
 
-//    private AtmOfficeService atmOfficeService;
-//
-//    @Autowired
-//    public GoodsRestController(AtmOfficeService atmOfficeService) {
-//        this.atmOfficeService = atmOfficeService;
-//    }
+    private ServiceDate serviceDate;
+
+    @Autowired
+    public GoodsRestController(ServiceDate serviceDate) {
+        this.serviceDate = serviceDate;
+    }
 
     /**
-     * REST контроллер возвращает банкомат по id
+     * в теле POST запроса приходит список дескрипторов актуальных промо-акции
      */
     @PostMapping("/promo")
     public ResponseEntity<?> getPromo(/*@PathVariable(name = "id") int id*/) {
-//        final AtmOffice atmOffice = atmOfficeService.getById(id);
+        final Item items = serviceDate.getByIdItem("3636974");
 
-//        return atmOffice != null
-//                ? new ResponseEntity<>(atmOffice, HttpStatus.OK)
-//                : new ResponseEntity<>(new ErrorRequest("branch not found"), HttpStatus.NOT_FOUND);
-        return new ResponseEntity<>("All right", HttpStatus.OK);
+        return items != null
+                ? new ResponseEntity<>(items, HttpStatus.OK)
+                : new ResponseEntity<>(/*new ErrorRequest("branch not found"),*/ HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * список товаров с корректными ценами и названиями, размером скидки, сумма чека и суммарный размер скидки
+     */
+    @PostMapping("/receipt")
+    public ResponseEntity<?> getActualPrice(@RequestBody BodyRequestReceipt bodyRequestReceipt) {
+        final Group groups = serviceDate.getByIdGroup("FD0223000");
+
+        return groups != null
+                ? new ResponseEntity<>(groups, HttpStatus.OK)
+                : new ResponseEntity<>(/*new ErrorRequest("branch not found"),*/ HttpStatus.NOT_FOUND);
     }
 }

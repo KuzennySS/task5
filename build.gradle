@@ -24,6 +24,8 @@ dependencies {
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    // A simple library for reading and writing CSV in Java
+    compile group: 'com.opencsv', name: 'opencsv', version: '5.2'
     // Swagger
     implementation group: 'io.springfox', name: 'springfox-swagger2', version: '2.9.2'
     implementation group: 'io.springfox', name: 'springfox-swagger-ui', version: '2.9.2'

@@ -3,11 +3,11 @@ package service;
 import models.Group;
 import models.Item;
 
-import java.util.List;
+import java.util.Map;
 
 public interface LoadData {
 
-    List<Item> getAllItems();
+    Map<String, Item> getAllItems();
 
-    List<Group> getAllGroup();
+    Map<String, Group> getAllGroup();
 }

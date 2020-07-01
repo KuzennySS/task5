@@ -6,9 +6,11 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Group {
+public class Position {
 
-    private String id;
+    private String itemId;
 
-    private String name;
+    private String quantity;
 }
+
+

@@ -1,34 +1,66 @@
 package service;
 
+import com.opencsv.CSVReader;
 import models.Group;
 import models.Item;
+import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.util.List;
+import java.util.*;
 
-public class DownloadDate implements LoadData{
+@Service
+public class DownloadDate implements LoadData {
 
-    BufferedReader reader;
-
-    {
+    @Override
+    public Map<String, Item> getAllItems() {
+        Map<String, Item> items = new HashMap<>();
         try {
-            reader = new BufferedReader(new FileReader(
-                        "csv\\groups.csv"));
-        } catch (FileNotFoundException e) {
+            //Build reader instance
+            CSVReader reader = new CSVReader(new FileReader("D:\\study\\task5\\src\\main\\resources\\csv\\items.csv"));
+            //Read all rows at once
+            List<String[]> allRows = reader.readAll();
+            //Read CSV line by line and use the string array as you want
+            for (String[] row : allRows) {
+                System.out.println(Arrays.toString(row));
+                if (!"id".equals(row[0])) {  // пропускаем 1-ю строку
+                    Item item = Item.builder()
+                            .id(row[0])
+                            .name(row[1])
+                            .groupId(row[2])
+                            .price(Double.valueOf(row[3]))
+                            .build();
+                    items.put(row[0],item);
+                }
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
+        return items;
     }
 
 
     @Override
-    public List<Item> getAllItems() {
-        return null;
-    }
-
-    @Override
-    public List<Group> getAllGroup() {
-        return null;
+    public Map<String, Group> getAllGroup() {
+        Map<String, Group> groups = new HashMap<>();
+        try {
+            //Build reader instance
+            CSVReader reader = new CSVReader(new FileReader("D:\\study\\task5\\src\\main\\resources\\csv\\groups.csv"));
+            //Read all rows at once
+            List<String[]> allRows = reader.readAll();
+            //Read CSV line by line and use the string array as you want
+            for (String[] row : allRows) {
+                System.out.println(Arrays.toString(row));
+                if (!"id".equals(row[0])) {  // пропускаем 1-ю строку
+                    Group group = Group.builder()
+                            .id(row[0])
+                            .name(row[1])
+                            .build();
+                    groups.put(row[0],group);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return groups;
     }
 }
