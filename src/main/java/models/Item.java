@@ -2,6 +2,8 @@ package models;
 
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
@@ -15,5 +17,5 @@ public class Item {
 
     private String groupId;
 
-    private Double price;
+    private BigDecimal price;
 }

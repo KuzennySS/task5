@@ -6,6 +6,7 @@ import models.Item;
 import org.springframework.stereotype.Service;
 
 import java.io.FileReader;
+import java.math.BigDecimal;
 import java.util.*;
 
 @Service
@@ -27,7 +28,7 @@ public class DownloadDate implements LoadData {
                             .id(row[0])
                             .name(row[1])
                             .groupId(row[2])
-                            .price(Double.valueOf(row[3]))
+                            .price(new BigDecimal(row[3]))
                             .build();
                     items.put(row[0],item);
                 }

@@ -4,8 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import models.dto.PositionDto;
+import models.dto.Positions;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,9 +15,9 @@ import java.util.List;
 @Builder
 public class BodyAnswerReceipt {
 
-      private Double total;
+      private BigDecimal total;
 
-      private Double discount;
+      private BigDecimal discount;
 
-      private List<PositionDto> positionDtos;
+      private List<Positions> positions;
 }

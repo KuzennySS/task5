@@ -1,5 +1,6 @@
 package controller;
 
+import models.BodyAnswerReceipt;
 import models.BodyRequestReceipt;
 import models.Group;
 import models.Item;
@@ -38,10 +39,10 @@ public class GoodsRestController {
      */
     @PostMapping("/receipt")
     public ResponseEntity<?> getActualPrice(@RequestBody BodyRequestReceipt bodyRequestReceipt) {
-        final Group groups = serviceDate.getByIdGroup("FD0223000");
+        final BodyAnswerReceipt bodyAnswerReceipt = serviceDate.prepareAnswer(bodyRequestReceipt);
 
-        return groups != null
-                ? new ResponseEntity<>(groups, HttpStatus.OK)
+        return bodyAnswerReceipt != null
+                ? new ResponseEntity<>(bodyAnswerReceipt, HttpStatus.OK)
                 : new ResponseEntity<>(/*new ErrorRequest("branch not found"),*/ HttpStatus.NOT_FOUND);
     }
 }
