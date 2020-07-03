@@ -40,7 +40,7 @@ groups.csv - товарные группы (id, название);
 {
   "shopId": 1,
   "loyaltyCard": false,
-  "positions":
+  "itemPositions":
   [
     {
       "itemId": "3432166",
@@ -53,7 +53,7 @@ groups.csv - товарные группы (id, название);
 {
   "total": 141.99,
   "discount": 0.00,
-  "positions":
+  "itemPositions":
   [
     {
       "id": "3432166",

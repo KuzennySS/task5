@@ -9,6 +9,9 @@ import java.io.FileReader;
 import java.math.BigDecimal;
 import java.util.*;
 
+/**
+ *  Сервис загрузки данных из файлов csv
+ */
 @Service
 public class DownloadDate implements LoadData {
 
