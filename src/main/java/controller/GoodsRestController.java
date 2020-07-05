@@ -1,6 +1,7 @@
 package controller;
 
 import models.answer.FinalPriceReceipt;
+import models.request.PromoMatrix;
 import models.request.ShoppingCart;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,8 @@ public class GoodsRestController {
 
     private CalculateCart calculateCart;
 
+    public static PromoMatrix promoMatrix;
+
     @Autowired
     public GoodsRestController(CalculateCart calculateCart) {
         this.calculateCart = calculateCart;
@@ -24,8 +27,8 @@ public class GoodsRestController {
      * Загрузка новой матрицы промо-механик
      */
     @PostMapping("/promo")
-    public ResponseEntity<?> getPromo(/*@RequestBody PromoMatrix body*/) {
-
+    public ResponseEntity<?> getPromo(@RequestBody PromoMatrix body) {
+        promoMatrix = body;
         return new ResponseEntity<>("Правила успешно загружены", HttpStatus.OK);
     }
 
@@ -33,8 +36,8 @@ public class GoodsRestController {
      * Расчитать стоимость позиций в чеке для указанной корзины
      */
     @PostMapping("/receipt")
-    public ResponseEntity<?> getActualPrice(@RequestBody ShoppingCart cart) {
-        final FinalPriceReceipt finalPriceReceipt = calculateCart.prepareAnswer(cart);
+    public ResponseEntity<?> getActualPrice(@RequestBody ShoppingCart body) {
+        final FinalPriceReceipt finalPriceReceipt = calculateCart.prepareAnswer(body);
 
         return finalPriceReceipt != null
                 ? new ResponseEntity<>(finalPriceReceipt, HttpStatus.OK)

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * Параметры скидки формата "N+k" (N+k единиц товара по цене N единиц)
+ * Скидки для сети
  */
 @Data
 @NoArgsConstructor

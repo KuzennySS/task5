@@ -13,6 +13,8 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static controller.GoodsRestController.promoMatrix;
+
 /**
  * Сервис расчета скидок и суммы чека с учетом скидок
  */
@@ -71,7 +73,17 @@ public class CalculateCart {
      * @return              -   процент скидки
      */
     private BigDecimal getPercentDiscount(String shopId, boolean loyaltyCard){
-        return loyaltyCard ? new BigDecimal("0.05") : new BigDecimal(0);
+        if (promoMatrix == null) return new BigDecimal("0.00");
+        // определяем какие скидки есть вообще
+//        Если для позиции в чеке может применяться сразу несколько промо-акций, то выбирается промо-акция с наиболее высоким приоритетом.
+//        Если для позиции чека подходят несколько промо-акций с одинаковым приоритетом, то нужно применять ту промо-акцию, которая даёт покупателю наибольшую скидку.
+
+
+        // если есть в наличии скидка по предъявлению пенсионного
+        if (loyaltyCard && promoMatrix.getLoyaltyCardRules() != null)
+            return BigDecimal.valueOf(promoMatrix.getLoyaltyCardRules().get(0).getDiscount());
+        return new BigDecimal("0.01");
+//        return loyaltyCard ? new BigDecimal("0.05") : new BigDecimal(0);
     }
 
     /**
