@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * Параметры скидки при покупке связанных товаров
  */
@@ -18,7 +20,7 @@ public class ItemGroupRules {
     private double discount;
 
     // ID группы связанных товаров
-    private String groupId;
+    private List<String> groupId;
 
     // 'Номер магазина, -1 для акции сети'
     private Integer shopId;

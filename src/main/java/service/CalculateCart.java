@@ -1,10 +1,13 @@
 package service;
 
-import models.answer.FinalPriceReceipt;
-import models.request.ShoppingCart;
 import models.Item;
-import models.request.ItemPosition;
 import models.answer.FinalPricePosition;
+import models.answer.FinalPriceReceipt;
+import models.dto.DiscountDto;
+import models.request.ItemCountRules;
+import models.request.ItemGroupRules;
+import models.request.ItemPosition;
+import models.request.ShoppingCart;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -30,12 +33,13 @@ public class CalculateCart {
 
     /**
      * Расчет стоимости всего заказа с учетом скидки
-     * @param shoppingCart    -   входной заказ
-     * @return                      -   рассчитанный заказ
+     *
+     * @param shoppingCart -   входной заказ
+     * @return -   рассчитанный заказ
      */
-    public FinalPriceReceipt prepareAnswer(ShoppingCart shoppingCart){
-        BigDecimal percent = getPercentDiscount(String.valueOf(shoppingCart.getShopId()), shoppingCart.getLoyaltyCard());
+    public FinalPriceReceipt prepareAnswer(ShoppingCart shoppingCart) {
         List<ItemPosition> itemPositions = shoppingCart.getPositions();
+        BigDecimal percent = getPercentDiscount(shoppingCart);
         List<FinalPricePosition> positionDtos = itemPositions.stream()
                 .map(itemPosition -> createPositionDto(itemPosition, percent))
                 .collect(Collectors.toList());
@@ -52,9 +56,10 @@ public class CalculateCart {
 
     /**
      * Подготовка PositionDto
-     * @param itemPosition  -   позиция товара
-     * @param percent   -   процент скидки
-     * @return          -   PositionDto
+     *
+     * @param itemPosition -   позиция товара
+     * @param percent      -   процент скидки
+     * @return -   PositionDto
      */
     private FinalPricePosition createPositionDto(ItemPosition itemPosition, BigDecimal percent) {
         Item item = serviceDate.getByIdItem(itemPosition.getItemId());
@@ -68,32 +73,115 @@ public class CalculateCart {
 
     /**
      * Расчет скидки исходя из акций магазина и наличия дисконтной карты
-     * @param shopId        -   номер магазина
-     * @param loyaltyCard   -   наличие дисконтной карты
-     * @return              -   процент скидки
+     *
+     * @param cart -   входной заказ
+     * @return -   процент скидки
      */
-    private BigDecimal getPercentDiscount(String shopId, boolean loyaltyCard){
+    private BigDecimal getPercentDiscount(ShoppingCart cart) {
         if (promoMatrix == null) return new BigDecimal("0.00");
-        // определяем какие скидки есть вообще
-//        Если для позиции в чеке может применяться сразу несколько промо-акций, то выбирается промо-акция с наиболее высоким приоритетом.
-//        Если для позиции чека подходят несколько промо-акций с одинаковым приоритетом, то нужно применять ту промо-акцию, которая даёт покупателю наибольшую скидку.
 
+        // Проверяем акции при покупке связанных товаров
+        BigDecimal percentItemGroup = promoMatrix.getItemGroupRules().stream()
+                .map(matrixCart -> checkItemGroupRules(matrixCart, cart))
+                .findAny().get();
+        return percentItemGroup;
+
+
+        // Проверяем акции при предъявлении пенсионного удостоверения или социальной карты
+
+        // Определяем, какая акция выгоднее для покупателя
+
+
+
+
+
+
+
+
+
+
+
+
+////        String shopId = String.valueOf(shoppingCart.getShopId());
+////        boolean loyaltyCard = shoppingCart.getLoyaltyCard();
+//        shoppingCart.getPositions().stream()
+//                .filter(this::checkCountRules)
+//                .
+//        // определяем какие скидки есть вообще и выбираем по приоритету
+//        if (promoMatrix.getItemCountRules() != null) {
+//
+//            BigDecimal percentCountRules =
+//        }
+//
+////        Если для позиции в чеке может применяться сразу несколько промо-акций, то выбирается промо-акция с наиболее высоким
+////        приоритетом.
+////        Если для позиции чека подходят несколько промо-акций с одинаковым приоритетом, то нужно применять ту промо-акцию,
+////        которая даёт покупателю наибольшую скидку.
+//
 
         // если есть в наличии скидка по предъявлению пенсионного
-        if (loyaltyCard && promoMatrix.getLoyaltyCardRules() != null)
-            return BigDecimal.valueOf(promoMatrix.getLoyaltyCardRules().get(0).getDiscount());
-        return new BigDecimal("0.01");
+//        if (loyaltyCard && promoMatrix.getLoyaltyCardRules() != null)
+//            return BigDecimal.valueOf(promoMatrix.getLoyaltyCardRules().get(0).getDiscount());
+//        return new BigDecimal("0.01");
 //        return loyaltyCard ? new BigDecimal("0.05") : new BigDecimal(0);
     }
 
     /**
-     * Расчет суммы по одному товару
-     * @param itemPosition  -   одна из позиций в чеке
-     * @return          -   сумма по одной позиции
+     * Проверяет корзину на наличие в ней всех акционных товаров
+     * @param matrixCart    -   группа товаров со скидкой
+     * @param shoppingCart  -   корзина покупателя
+     * @return              -   скидка
      */
-    private BigDecimal getSum(ItemPosition itemPosition){
+    private BigDecimal checkItemGroupRules(ItemGroupRules matrixCart, ShoppingCart shoppingCart){
+        // проверяем на совпадения id магазина
+        if (matrixCart.getShopId().equals(shoppingCart.getShopId())){
+            // получить какая группа акционных товаров должна быть
+            List<String> actionGroups = matrixCart.getGroupId();
+            // получить список групп для товаров из корзины
+            List<String> cartGroups = shoppingCart.getPositions().stream()
+                    .map(cart -> serviceDate.getByIdItem(cart.getItemId()).getGroupId())
+                    .collect(Collectors.toList());
+            // проверить вхождение этой группы в корзину
+            long containCart = actionGroups.stream()
+                    .filter(cartGroups::contains)
+                    .distinct()
+                    .count();
+            if (containCart == actionGroups.size()) return BigDecimal.valueOf(matrixCart.getDiscount());
+        }
+        return BigDecimal.valueOf(0);
+    }
+
+    /**
+     * Проходит по всему списку акций и проверяет наличие акционных товаров в корзине
+     * @param itemPosition  -   позиция, которая проверяется на наличие акций на нее
+     * @return              -   true акция выполняется, false не выполняется
+     */
+    private Boolean checkCountRules(ItemPosition itemPosition) {
+        return promoMatrix.getItemCountRules().stream()
+                .anyMatch(promoMatrix -> checkRule(itemPosition, promoMatrix));
+    }
+
+    /**
+     * Проверяет выполнение условий акции для конкретной позиции в списке
+     * @param itemPosition  -   позиция, которая проверяется на наличие акций на нее
+     * @param promoMatrix   -   одно из акционных условий
+     * @return              -   true акция выполняется, false не выполняется
+     */
+    private boolean checkRule(ItemPosition itemPosition, ItemCountRules promoMatrix) {
+        return promoMatrix.getItemId().equals(itemPosition.getItemId())
+                && promoMatrix.getBonusQuantity() <= Integer.parseInt(itemPosition.getItemId());
+    }
+
+    /**
+     * Расчет суммы по одному товару
+     *
+     * @param itemPosition -   одна из позиций в чеке
+     * @return -   сумма по одной позиции
+     */
+    private BigDecimal getSum(ItemPosition itemPosition) {
         Item item = serviceDate.getByIdItem(itemPosition.getItemId());
         return item.getPrice().multiply(new BigDecimal(itemPosition.getQuantity()));
 
     }
+
 }
