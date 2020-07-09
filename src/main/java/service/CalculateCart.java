@@ -3,17 +3,15 @@ package service;
 import models.Item;
 import models.answer.FinalPricePosition;
 import models.answer.FinalPriceReceipt;
-import models.dto.DiscountDto;
-import models.request.ItemCountRules;
-import models.request.ItemGroupRules;
-import models.request.ItemPosition;
-import models.request.ShoppingCart;
+import models.dto.ActionNaddK;
+import models.request.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static controller.GoodsRestController.promoMatrix;
@@ -47,9 +45,33 @@ public class CalculateCart {
                 .map(this::getSum)
                 .reduce(BigDecimal::add)
                 .get();
+        BigDecimal discount = percent.multiply(sum).setScale(2, RoundingMode.HALF_EVEN);
+
+        // включить проверку на акцию "N+k"
+        ActionNaddK actionNaddK = getActionNaddK(shoppingCart);
+        Integer bonusMatrixCount = actionNaddK.getBonusQuantity();
+        BigDecimal sumDiscount = BigDecimal.valueOf(0);
+        if (bonusMatrixCount != 0) {
+            Integer positionWithBonus = Integer.parseInt(shoppingCart.getPositions().stream()
+                    .filter(cart -> cart.getItemId().equals(actionNaddK.getIdPosition()))
+                    .map(ItemPosition::getQuantity)
+                    .findAny()
+                    .get());
+            int delta = positionWithBonus - actionNaddK.getTrigerQuantity();
+            if (delta < bonusMatrixCount){
+                sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply(BigDecimal.valueOf(delta));
+            }
+            else {
+                sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply((BigDecimal.valueOf(bonusMatrixCount)));
+            }
+            sum = sum.subtract(sumDiscount);
+            discount = sumDiscount;
+        }
+
+
         return FinalPriceReceipt.builder()
                 .total(sum.multiply(new BigDecimal(1).subtract(percent)).setScale(2, RoundingMode.HALF_EVEN))
-                .discount(percent.multiply(sum).setScale(2, RoundingMode.HALF_EVEN))
+                .discount(discount)
                 .positions(positionDtos)
                 .build();
     }
@@ -84,57 +106,67 @@ public class CalculateCart {
         BigDecimal percentItemGroup = promoMatrix.getItemGroupRules().stream()
                 .map(matrixCart -> checkItemGroupRules(matrixCart, cart))
                 .findAny().get();
-        return percentItemGroup;
 
+        // Проверка акций по карте лояльности
+        BigDecimal percentLoyaltyCard = BigDecimal.valueOf(0);
+        if (cart.getLoyaltyCard()) {
+            Optional<LoyaltyCardRule> loyaltyCardRule = promoMatrix.getLoyaltyCardRules().stream()
+                    .filter(item -> item.getShopId().equals(cart.getShopId()))
+                    .findAny();
+            if (loyaltyCardRule.isPresent()) {
+                percentLoyaltyCard = BigDecimal.valueOf(loyaltyCardRule.get().getDiscount());
+            }
+        }
 
-        // Проверяем акции при предъявлении пенсионного удостоверения или социальной карты
+        return percentLoyaltyCard;
 
         // Определяем, какая акция выгоднее для покупателя
 
+    }
 
+    private ActionNaddK getActionNaddK(ShoppingCart cart) {
+        // Проверка акции формата "N+k"
+        String bonusPosition = null;
+        int trigerQuantity = 0;
+        int bonusQuantity = 0;
+        List<ItemCountRules> itemCountRules = promoMatrix.getItemCountRules();
+        if (itemCountRules.size() > 0) {
+            Optional<ItemCountRules> discountItemCountRule = itemCountRules.stream()
+                    .filter(itemCountRule -> checkItemCountRule(itemCountRule, cart))
+                    .findAny();
+            if (discountItemCountRule.isPresent()) {
+                bonusQuantity = discountItemCountRule.get().getBonusQuantity();
+                bonusPosition = discountItemCountRule.get().getItemId();
+                trigerQuantity = discountItemCountRule.get().getTriggerQuantity();
+            }
+        }
+        return ActionNaddK.builder()
+                .idPosition(bonusPosition)
+                .bonusQuantity(bonusQuantity)
+                .trigerQuantity(trigerQuantity)
+                .build();
+    }
 
-
-
-
-
-
-
-
-
-
-////        String shopId = String.valueOf(shoppingCart.getShopId());
-////        boolean loyaltyCard = shoppingCart.getLoyaltyCard();
-//        shoppingCart.getPositions().stream()
-//                .filter(this::checkCountRules)
-//                .
-//        // определяем какие скидки есть вообще и выбираем по приоритету
-//        if (promoMatrix.getItemCountRules() != null) {
-//
-//            BigDecimal percentCountRules =
-//        }
-//
-////        Если для позиции в чеке может применяться сразу несколько промо-акций, то выбирается промо-акция с наиболее высоким
-////        приоритетом.
-////        Если для позиции чека подходят несколько промо-акций с одинаковым приоритетом, то нужно применять ту промо-акцию,
-////        которая даёт покупателю наибольшую скидку.
-//
-
-        // если есть в наличии скидка по предъявлению пенсионного
-//        if (loyaltyCard && promoMatrix.getLoyaltyCardRules() != null)
-//            return BigDecimal.valueOf(promoMatrix.getLoyaltyCardRules().get(0).getDiscount());
-//        return new BigDecimal("0.01");
-//        return loyaltyCard ? new BigDecimal("0.05") : new BigDecimal(0);
+    private boolean checkItemCountRule(ItemCountRules itemCountRule, ShoppingCart carts) {
+        if (itemCountRule.getShopId().equals(carts.getShopId())) {
+            Optional<ItemPosition> itemPosition = carts.getPositions().stream()
+                    .filter(cart -> cart.getItemId().equals(itemCountRule.getItemId()))
+                    .findAny();
+            return itemPosition.isPresent();
+        }
+        return false;
     }
 
     /**
      * Проверяет корзину на наличие в ней всех акционных товаров
-     * @param matrixCart    -   группа товаров со скидкой
-     * @param shoppingCart  -   корзина покупателя
-     * @return              -   скидка
+     *
+     * @param matrixCart   -   группа товаров со скидкой
+     * @param shoppingCart -   корзина покупателя
+     * @return -   скидка
      */
-    private BigDecimal checkItemGroupRules(ItemGroupRules matrixCart, ShoppingCart shoppingCart){
+    private BigDecimal checkItemGroupRules(ItemGroupRules matrixCart, ShoppingCart shoppingCart) {
         // проверяем на совпадения id магазина
-        if (matrixCart.getShopId().equals(shoppingCart.getShopId())){
+        if (matrixCart.getShopId().equals(shoppingCart.getShopId())) {
             // получить какая группа акционных товаров должна быть
             List<String> actionGroups = matrixCart.getGroupId();
             // получить список групп для товаров из корзины
@@ -153,8 +185,9 @@ public class CalculateCart {
 
     /**
      * Проходит по всему списку акций и проверяет наличие акционных товаров в корзине
-     * @param itemPosition  -   позиция, которая проверяется на наличие акций на нее
-     * @return              -   true акция выполняется, false не выполняется
+     *
+     * @param itemPosition -   позиция, которая проверяется на наличие акций на нее
+     * @return -   true акция выполняется, false не выполняется
      */
     private Boolean checkCountRules(ItemPosition itemPosition) {
         return promoMatrix.getItemCountRules().stream()
@@ -163,9 +196,10 @@ public class CalculateCart {
 
     /**
      * Проверяет выполнение условий акции для конкретной позиции в списке
-     * @param itemPosition  -   позиция, которая проверяется на наличие акций на нее
-     * @param promoMatrix   -   одно из акционных условий
-     * @return              -   true акция выполняется, false не выполняется
+     *
+     * @param itemPosition -   позиция, которая проверяется на наличие акций на нее
+     * @param promoMatrix  -   одно из акционных условий
+     * @return -   true акция выполняется, false не выполняется
      */
     private boolean checkRule(ItemPosition itemPosition, ItemCountRules promoMatrix) {
         return promoMatrix.getItemId().equals(itemPosition.getItemId())
