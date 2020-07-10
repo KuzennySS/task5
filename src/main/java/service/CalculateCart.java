@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -58,10 +60,9 @@ public class CalculateCart {
                     .findAny()
                     .get());
             int delta = positionWithBonus - actionNaddK.getTrigerQuantity();
-            if (delta < bonusMatrixCount){
+            if (delta < bonusMatrixCount) {
                 sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply(BigDecimal.valueOf(delta));
-            }
-            else {
+            } else {
                 sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply((BigDecimal.valueOf(bonusMatrixCount)));
             }
             sum = sum.subtract(sumDiscount);
@@ -103,9 +104,13 @@ public class CalculateCart {
         if (promoMatrix == null) return new BigDecimal("0.00");
 
         // Проверяем акции при покупке связанных товаров
-        BigDecimal percentItemGroup = promoMatrix.getItemGroupRules().stream()
+        BigDecimal percentItemGroup = BigDecimal.valueOf(0);
+        Optional<BigDecimal> percentItemGroupOpt = promoMatrix.getItemGroupRules().stream()
                 .map(matrixCart -> checkItemGroupRules(matrixCart, cart))
-                .findAny().get();
+                .findAny();
+        if (percentItemGroupOpt.isPresent()) {
+            percentItemGroup = percentItemGroupOpt.get();
+        }
 
         // Проверка акций по карте лояльности
         BigDecimal percentLoyaltyCard = BigDecimal.valueOf(0);
@@ -118,10 +123,11 @@ public class CalculateCart {
             }
         }
 
-        return percentLoyaltyCard;
-
         // Определяем, какая акция выгоднее для покупателя
-
+        if (percentItemGroup.compareTo(percentLoyaltyCard) >= 0) {
+            return percentItemGroup;
+        }
+        return percentLoyaltyCard;
     }
 
     private ActionNaddK getActionNaddK(ShoppingCart cart) {
@@ -165,22 +171,43 @@ public class CalculateCart {
      * @return -   скидка
      */
     private BigDecimal checkItemGroupRules(ItemGroupRules matrixCart, ShoppingCart shoppingCart) {
+        BigDecimal result = BigDecimal.valueOf(0);
         // проверяем на совпадения id магазина
         if (matrixCart.getShopId().equals(shoppingCart.getShopId())) {
-            // получить какая группа акционных товаров должна быть
+            // группа всех акционных товаров в этом магазине
             List<String> actionGroups = matrixCart.getGroupId();
-            // получить список групп для товаров из корзины
-            List<String> cartGroups = shoppingCart.getPositions().stream()
-                    .map(cart -> serviceDate.getByIdItem(cart.getItemId()).getGroupId())
-                    .collect(Collectors.toList());
-            // проверить вхождение этой группы в корзину
-            long containCart = actionGroups.stream()
-                    .filter(cartGroups::contains)
-                    .distinct()
-                    .count();
-            if (containCart == actionGroups.size()) return BigDecimal.valueOf(matrixCart.getDiscount());
+            // группа для товаров из корзины
+            Map<String, Integer> cartGroups = new HashMap<>();
+            List<ItemPosition> positions = shoppingCart.getPositions();
+            positions.forEach(cart -> cartGroups.put(getGrouId(cart), cartGroups.getOrDefault(getGrouId(cart), 0) + 1));
+            // получаем группу товаров на которую надо считать скидку
+            Optional<String> groupDiscount = actionGroups.stream()
+                    .filter(group -> cartGroups.get(group) >= 2)
+                    .findFirst();
+            if (groupDiscount.isPresent()) {
+                // получить все товары с ценой и количеством из группы на которую делаем скидку
+                Map<String, Integer> itemDiscounts = new HashMap<>();
+                positions.stream()
+                        .filter(itemPosition -> getGrouId(itemPosition).equals(groupDiscount.get()))
+                        .forEach(itemPosition -> itemDiscounts.put(itemPosition.getItemId(), itemDiscounts.getOrDefault(itemPosition.getItemId(), 0) + 1));
+                // рассчитывам скидку, которую передим в конечный расчет
+                result = itemDiscounts.keySet().stream()
+                        .map(key -> BigDecimal.valueOf(itemDiscounts.get(key)).multiply(serviceDate.getByIdItem(key).getPrice()))
+                        .reduce(BigDecimal::add).get();
+
+            }
         }
-        return BigDecimal.valueOf(0);
+        return result;
+    }
+
+    /**
+     * Получаем ключ (группа товаров) для Map
+     *
+     * @param cart -   корзина
+     * @return -   String ключ название группы
+     */
+    private String getGrouId(ItemPosition cart) {
+        return serviceDate.getByIdItem(cart.getItemId()).getGroupId();
     }
 
     /**
