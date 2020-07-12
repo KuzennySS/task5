@@ -39,40 +39,51 @@ public class CalculateCart {
      */
     public FinalPriceReceipt prepareAnswer(ShoppingCart shoppingCart) {
         List<ItemPosition> itemPositions = shoppingCart.getPositions();
-        BigDecimal percent = getPercentDiscount(shoppingCart);
-        List<FinalPricePosition> positionDtos = itemPositions.stream()
-                .map(itemPosition -> createPositionDto(itemPosition, percent))
-                .collect(Collectors.toList());
+        // расчет суммы без скидки
         BigDecimal sum = itemPositions.stream()
                 .map(this::getSum)
                 .reduce(BigDecimal::add)
                 .get();
-        BigDecimal discount = percent.multiply(sum).setScale(2, RoundingMode.HALF_EVEN);
 
-        // включить проверку на акцию "N+k"
-        ActionNaddK actionNaddK = getActionNaddK(shoppingCart);
-        Integer bonusMatrixCount = actionNaddK.getBonusQuantity();
-        BigDecimal sumDiscount = BigDecimal.valueOf(0);
-        if (bonusMatrixCount != 0) {
-            Integer positionWithBonus = Integer.parseInt(shoppingCart.getPositions().stream()
-                    .filter(cart -> cart.getItemId().equals(actionNaddK.getIdPosition()))
-                    .map(ItemPosition::getQuantity)
-                    .findAny()
-                    .get());
-            int delta = positionWithBonus - actionNaddK.getTrigerQuantity();
-            if (delta < bonusMatrixCount) {
-                sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply(BigDecimal.valueOf(delta));
+        // сумма скидки по акциям
+        BigDecimal sumDiscount;
+        // процент скидки по акции
+        BigDecimal percentDiscount = BigDecimal.valueOf(0);
+        // Проверка наличия скидочных акций
+        if (promoMatrix != null){
+            // Получение процента скидки по Промо-акции Карта Лояльности
+            BigDecimal percentLoyalityCard = getProcentLoyalityCardDiscount(shoppingCart);
+            BigDecimal sumDiscountLoyalityCard = sum.multiply(percentLoyalityCard);
+            // Получение скидки по Промо-акция N+k
+            BigDecimal sumDiscountNaddK = getSumDiscountDiscountNaddK(shoppingCart);
+            // Получение скидки по Промо-акция Скидка на товарную группу
+            BigDecimal sumDiscountItemGroup = getSumDiscountItemGroupDiscount(shoppingCart);
+            // сравнить действующие скидки и получить максимальную
+            if (sumDiscountLoyalityCard.compareTo(sumDiscountNaddK) >= 0 && sumDiscountLoyalityCard.compareTo(sumDiscountItemGroup) >= 0){
+                sumDiscount = sumDiscountLoyalityCard.setScale(2, RoundingMode.HALF_EVEN);
+                percentDiscount = percentLoyalityCard;
+            } else if (sumDiscountNaddK.compareTo(sumDiscountLoyalityCard) >= 0 && sumDiscountNaddK.compareTo(sumDiscountItemGroup) >= 0 ){
+                sumDiscount = sumDiscountNaddK.setScale(2, RoundingMode.HALF_EVEN);
             } else {
-                sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply((BigDecimal.valueOf(bonusMatrixCount)));
+                sumDiscount = sumDiscountItemGroup;
             }
-            sum = sum.subtract(sumDiscount);
-            discount = sumDiscount;
+        }
+        else {
+            sumDiscount = new BigDecimal("0.00");
         }
 
+        // позиции в чеке с полной ценой и со скидкой
+        BigDecimal finalPercentDiscount = percentDiscount;
+        List<FinalPricePosition> positionDtos = itemPositions.stream()
+                .map(itemPosition -> createPositionDto(itemPosition, finalPercentDiscount))
+                .collect(Collectors.toList());
+
+        // итоговая сумма
+        BigDecimal sumResult = sum.multiply(new BigDecimal(1).subtract(sumDiscount)).setScale(2, RoundingMode.HALF_EVEN);
 
         return FinalPriceReceipt.builder()
-                .total(sum.multiply(new BigDecimal(1).subtract(percent)).setScale(2, RoundingMode.HALF_EVEN))
-                .discount(discount)
+                .total(sumResult)
+                .discount(sumDiscount)
                 .positions(positionDtos)
                 .build();
     }
@@ -95,23 +106,11 @@ public class CalculateCart {
     }
 
     /**
-     * Расчет скидки исходя из акций магазина и наличия дисконтной карты
-     *
-     * @param cart -   входной заказ
-     * @return -   процент скидки
+     * Расчет процента скидки исходя из акций магазина и наличия дисконтной карты
+     * @param cart                  -   входной заказ
+     * @return percentLoyaltyCard   -   процент скидка по акции LoyalityCardD
      */
-    private BigDecimal getPercentDiscount(ShoppingCart cart) {
-        if (promoMatrix == null) return new BigDecimal("0.00");
-
-        // Проверяем акции при покупке связанных товаров
-        BigDecimal percentItemGroup = BigDecimal.valueOf(0);
-        Optional<BigDecimal> percentItemGroupOpt = promoMatrix.getItemGroupRules().stream()
-                .map(matrixCart -> checkItemGroupRules(matrixCart, cart))
-                .findAny();
-        if (percentItemGroupOpt.isPresent()) {
-            percentItemGroup = percentItemGroupOpt.get();
-        }
-
+    private BigDecimal getProcentLoyalityCardDiscount(ShoppingCart cart) {
         // Проверка акций по карте лояльности
         BigDecimal percentLoyaltyCard = BigDecimal.valueOf(0);
         if (cart.getLoyaltyCard()) {
@@ -122,15 +121,58 @@ public class CalculateCart {
                 percentLoyaltyCard = BigDecimal.valueOf(loyaltyCardRule.get().getDiscount());
             }
         }
-
-        // Определяем, какая акция выгоднее для покупателя
-        if (percentItemGroup.compareTo(percentLoyaltyCard) >= 0) {
-            return percentItemGroup;
-        }
         return percentLoyaltyCard;
     }
 
-    private ActionNaddK getActionNaddK(ShoppingCart cart) {
+    /**
+     * Рассчет суммы скикди исходя из акцию "N+k"
+     * @param basket                -   входной заказ
+     * @return sumDiscount          -   сумма скидки по акции "N+k"
+     */
+    private BigDecimal getSumDiscountDiscountNaddK(ShoppingCart basket) {
+        // включить проверку на акцию "N+k"
+        ActionNaddK actionNaddK = getNaddKdiscount(basket);
+        Integer bonusMatrixCount = actionNaddK.getBonusQuantity();
+        BigDecimal sumDiscount = BigDecimal.valueOf(0);
+        if (bonusMatrixCount != 0) {
+            Integer positionWithBonus = Integer.parseInt(basket.getPositions().stream()
+                    .filter(cart -> cart.getItemId().equals(actionNaddK.getIdPosition()))
+                    .map(ItemPosition::getQuantity)
+                    .findAny()
+                    .get());
+            int delta = positionWithBonus - actionNaddK.getTrigerQuantity();
+            if (delta < bonusMatrixCount) {
+                sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply(BigDecimal.valueOf(delta));
+            } else {
+                sumDiscount = serviceDate.getByIdItem(String.valueOf(actionNaddK.getIdPosition())).getPrice().multiply((BigDecimal.valueOf(bonusMatrixCount)));
+            }
+        }
+        return sumDiscount;
+    }
+
+    /**
+     * Расчет скидки исходя из акций магазина и наличия дисконтной карты
+     * @param cart                  -   входной заказ
+     * @return percentItemGroup     -   сумму скидки по акции LoyalityCardD
+     */
+    private BigDecimal getSumDiscountItemGroupDiscount(ShoppingCart cart) {
+        // Проверяем акции при покупке связанных товаров
+        BigDecimal percentItemGroup = BigDecimal.valueOf(0);
+        Optional<BigDecimal> percentItemGroupOpt = promoMatrix.getItemGroupRules().stream()
+                .map(matrixCart -> checkItemGroupRules(matrixCart, cart))
+                .findAny();
+        if (percentItemGroupOpt.isPresent()) {
+            percentItemGroup = percentItemGroupOpt.get();
+        }
+        return percentItemGroup;
+    }
+
+    /**
+     * Расчет скидки исходя из акций Промо-акция N+k
+     * @param cart                  -   входной заказ
+     * @return percentItemGroup     -   сумму скидки по акции LoyalityCardD
+     */
+    private ActionNaddK getNaddKdiscount(ShoppingCart cart) {
         // Проверка акции формата "N+k"
         String bonusPosition = null;
         int trigerQuantity = 0;
@@ -164,7 +206,7 @@ public class CalculateCart {
     }
 
     /**
-     * Проверяет корзину на наличие в ней всех акционных товаров
+     * Проверяет корзину на наличие в ней всех акционных товаров для групповой скидки
      *
      * @param matrixCart   -   группа товаров со скидкой
      * @param shoppingCart -   корзина покупателя
