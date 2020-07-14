@@ -50,7 +50,7 @@ public class CalculateCart {
         // процент скидки по акции
         BigDecimal percentDiscount = BigDecimal.valueOf(0);
         // Проверка наличия скидочных акций
-        if (promoMatrix != null){
+        if (promoMatrix.getItemCountRules() != null || promoMatrix.getLoyaltyCardRules() != null || promoMatrix.getItemGroupRules() != null){
             // Получение процента скидки по Промо-акции Карта Лояльности
             BigDecimal percentLoyalityCard = getProcentLoyalityCardDiscount(shoppingCart);
             BigDecimal sumDiscountLoyalityCard = sum.multiply(percentLoyalityCard);
@@ -79,7 +79,7 @@ public class CalculateCart {
                 .collect(Collectors.toList());
 
         // итоговая сумма
-        BigDecimal sumResult = sum.multiply(new BigDecimal(1).subtract(sumDiscount)).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal sumResult = sum.subtract(sumDiscount).setScale(2, RoundingMode.HALF_EVEN);
 
         return FinalPriceReceipt.builder()
                 .total(sumResult)
@@ -235,7 +235,9 @@ public class CalculateCart {
                 // рассчитывам скидку, которую передим в конечный расчет
                 result = itemDiscounts.keySet().stream()
                         .map(key -> BigDecimal.valueOf(itemDiscounts.get(key)).multiply(serviceDate.getByIdItem(key).getPrice()))
-                        .reduce(BigDecimal::add).get();
+                        .reduce(BigDecimal::add)
+                        .map(sum -> sum.multiply(BigDecimal.valueOf(matrixCart.getDiscount())))
+                        .get();
 
             }
         }
